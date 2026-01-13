@@ -1,3 +1,5 @@
+-- nameless_hub_library.lua
+-- Updated: improve mobile (Android) touch support for toggles and ensure single draggable show/hide button.
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -180,7 +182,7 @@ function Library.new(opts)
     local rightLayout = make("UIListLayout", { Parent = rightScroll, Padding = UDim.new(0,8), FillDirection = Enum.FillDirection.Vertical })
     rightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
-    -- external show/hide btn (left-center) - keep only one toggle button and make it draggable
+    -- external show/hide btn (left-center) - single draggable button
     local externalSize = 44
     local externalBtn = make("ImageButton", {
         Parent = screenGui,
@@ -220,6 +222,7 @@ function Library.new(opts)
 
         externalBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                -- If it's a touch and short tap, this may be a toggle click instead of drag.
                 dragging = true
                 dragInput = input
                 dragStart = input.Position
@@ -240,8 +243,8 @@ function Library.new(opts)
         end)
     end
 
-    -- single toggle behavior
-    externalBtn.MouseButton1Click:Connect(function()
+    -- single toggle behavior - use :Activated for unified click/touch behavior on all devices
+    externalBtn.Activated:Connect(function()
         if self._visible then
             self:Hide()
             externalIcon.Text = "▾"
@@ -393,7 +396,7 @@ function Library.new(opts)
                 ImageTransparency = 0.05,
                 ImageColor3 = self._parent.Theme.Text,
             })
-            btn.MouseButton1Click:Connect(function() pcall(callback) end)
+            btn.Activated:Connect(function() pcall(callback) end)
             return frame
         end
 
@@ -438,7 +441,7 @@ function Library.new(opts)
         -- Toggle (pasted3 style) - fixed so whole container and inner toggle both toggle
         -- signature: page:Toggle(text, defaultValue, description, callback)
         function page:Toggle(text, defaultValue, description, callback)
-            -- container is a Frame so child TextButtons can be clicked independently
+            -- container is a Frame so child buttons can be clicked independently
             local container = make("Frame", {
                 Parent = self._parent._rightScroll,
                 BackgroundColor3 = self._parent.Theme.Primary,
@@ -490,7 +493,7 @@ function Library.new(opts)
                 Size = UDim2.new(0, 40, 0, 22),
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, -10, 0.5, 0),
-                ZIndex = 5,
+                ZIndex = 10, -- increased to ensure it gets touch events before row catcher
             })
             make("UICorner", { Parent = toggleFrame, CornerRadius = UDim.new(0, 10) })
             local outerStroke = make("UIStroke", { Parent = toggleFrame, Color = self._parent.Theme.Primary, Thickness = 1 })
@@ -503,7 +506,7 @@ function Library.new(opts)
                 Size = UDim2.new(1, 0, 1, 0),
                 AutoButtonColor = false,
                 Text = "",
-                ZIndex = 6,
+                ZIndex = 11,
             })
             make("UICorner", { Parent = toggleBtn, CornerRadius = UDim.new(0, 10) })
 
@@ -514,7 +517,7 @@ function Library.new(opts)
                 Size = UDim2.new(0, 16, 0, 16),
                 Position = UDim2.new(0, 4, 0.5, 0),
                 AnchorPoint = Vector2.new(0, 0.5),
-                ZIndex = 7,
+                ZIndex = 12,
             })
             make("UICorner", { Parent = circle, CornerRadius = UDim.new(0, 16) })
 
@@ -552,21 +555,10 @@ function Library.new(opts)
                 pcall(callback, state)
             end
 
-            -- Connect both the invisible click area (row) and the small toggle button to the same action.
-            -- For better mobile support, listen to InputBegan for Touch as well as MouseButton1Click.
-            clickArea.MouseButton1Click:Connect(toggleAction)
-            clickArea.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.Touch then
-                    toggleAction()
-                end
-            end)
-
-            toggleBtn.MouseButton1Click:Connect(toggleAction)
-            toggleBtn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.Touch then
-                    toggleAction()
-                end
-            end)
+            -- Use :Activated which unifies touch and mouse activation across devices (recommended for mobile)
+            -- We intentionally connect both the row and the small toggle so tapping either toggles it.
+            clickArea.Activated:Connect(function() toggleAction() end)
+            toggleBtn.Activated:Connect(function() toggleAction() end)
 
             -- Initialize
             setVisual(state)
@@ -751,7 +743,7 @@ function Library.new(opts)
                         TweenService:Create(itemBtn, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
                         TweenService:Create(selIndicator, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
                     end)
-                    itemBtn.MouseButton1Click:Connect(function()
+                    itemBtn.Activated:Connect(function()
                         open = false
                         selectBtn.Text = "   " .. itemBtn.Text
                         pcall(onSelect, itemBtn.Text)
@@ -772,7 +764,7 @@ function Library.new(opts)
 
             populate(items)
 
-            selectBtn.MouseButton1Click:Connect(function()
+            selectBtn.Activated:Connect(function()
                 if open then
                     open = false
                     if dropdownContainer then
@@ -828,7 +820,7 @@ function Library.new(opts)
         end
 
         -- tab button behavior (highlight)
-        btn.MouseButton1Click:Connect(function()
+        btn.Activated:Connect(function()
             self.SectionTitle.Text = pageTitle
             for _, child in ipairs(self._tabsScroll:GetChildren()) do
                 if child:IsA("TextButton") then child.BackgroundColor3 = Color3.fromRGB(30,30,30) end
