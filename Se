@@ -1,5 +1,5 @@
 -- nameless_hub_library.lua
--- Updated: improve mobile (Android) touch support for toggles and ensure single draggable show/hide button.
+-- Full updated library with a new Android-friendly Toggle and single draggable show/hide button.
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -123,7 +123,8 @@ function Library.new(opts)
     make("UICorner", { Parent = closeBtn, CornerRadius = UDim.new(0, 6) })
     make("UIStroke", { Parent = closeBtn, Color = self.Theme.Accent, Thickness = 1 })
 
-    closeBtn.MouseButton1Click:Connect(function()
+    -- use Activated for cross-device reliability
+    closeBtn.Activated:Connect(function()
         if self._visible then self:Hide() else self:Show() end
     end)
 
@@ -222,7 +223,6 @@ function Library.new(opts)
 
         externalBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                -- If it's a touch and short tap, this may be a toggle click instead of drag.
                 dragging = true
                 dragInput = input
                 dragStart = input.Position
@@ -438,10 +438,10 @@ function Library.new(opts)
             return sp
         end
 
-        -- Toggle (pasted3 style) - fixed so whole container and inner toggle both toggle
+        -- NEW Toggle (Android-friendly)
         -- signature: page:Toggle(text, defaultValue, description, callback)
         function page:Toggle(text, defaultValue, description, callback)
-            -- container is a Frame so child buttons can be clicked independently
+            -- container (Frame so children can be interactive independently)
             local container = make("Frame", {
                 Parent = self._parent._rightScroll,
                 BackgroundColor3 = self._parent.Theme.Primary,
@@ -458,7 +458,7 @@ function Library.new(opts)
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 35),
                 Font = Enum.Font.GothamSemibold,
-                Text = text,
+                Text = tostring(text or ""),
                 TextColor3 = self._parent.Theme.Text,
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
@@ -484,44 +484,44 @@ function Library.new(opts)
                 descLbl.Visible = false
             end
 
-            -- Small toggle track (on the right). Give it higher ZIndex so it receives input above the invisible click catcher.
+            -- Visible toggle (give it a HIGH ZIndex so it receives touch before the row click area)
             local toggleFrame = make("Frame", {
                 Parent = container,
                 Name = "ToggleFrame",
                 BackgroundColor3 = self._parent.Theme.Dark,
                 BackgroundTransparency = 0,
-                Size = UDim2.new(0, 40, 0, 22),
+                Size = UDim2.new(0, 44, 0, 24),
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, -10, 0.5, 0),
-                ZIndex = 10, -- increased to ensure it gets touch events before row catcher
+                ZIndex = 50,
             })
-            make("UICorner", { Parent = toggleFrame, CornerRadius = UDim.new(0, 10) })
+            make("UICorner", { Parent = toggleFrame, CornerRadius = UDim.new(0, 12) })
             local outerStroke = make("UIStroke", { Parent = toggleFrame, Color = self._parent.Theme.Primary, Thickness = 1 })
 
             local toggleBtn = make("TextButton", {
                 Parent = toggleFrame,
                 Name = "ToggleButton",
-                BackgroundColor3 = self._parent.Theme.Dark,
                 BackgroundTransparency = 0,
+                BackgroundColor3 = self._parent.Theme.Dark,
                 Size = UDim2.new(1, 0, 1, 0),
                 AutoButtonColor = false,
                 Text = "",
-                ZIndex = 11,
+                ZIndex = 51,
             })
-            make("UICorner", { Parent = toggleBtn, CornerRadius = UDim.new(0, 10) })
+            make("UICorner", { Parent = toggleBtn, CornerRadius = UDim.new(0, 12) })
 
             local circle = make("Frame", {
                 Parent = toggleBtn,
                 Name = "Circle",
                 BackgroundColor3 = self._parent.Theme.Primary,
-                Size = UDim2.new(0, 16, 0, 16),
-                Position = UDim2.new(0, 4, 0.5, 0),
+                Size = UDim2.new(0, 18, 0, 18),
+                Position = UDim2.new(0, 5, 0.5, 0),
                 AnchorPoint = Vector2.new(0, 0.5),
-                ZIndex = 12,
+                ZIndex = 52,
             })
-            make("UICorner", { Parent = circle, CornerRadius = UDim.new(0, 16) })
+            make("UICorner", { Parent = circle, CornerRadius = UDim.new(0, 18) })
 
-            -- Invisible click-catcher that covers the row (but is beneath toggleFrame via ZIndex)
+            -- Row-level click area (beneath the visible toggle via ZIndex)
             local clickArea = make("TextButton", {
                 Parent = container,
                 Name = "ClickArea",
@@ -533,19 +533,21 @@ function Library.new(opts)
                 ZIndex = 1,
             })
 
-            local state = defaultValue and true or false
+            -- State
+            local state = (defaultValue and true) or false
 
             local function setVisual(on)
                 if on then
                     outerStroke.Thickness = 0
-                    TweenService:Create(circle, TweenInfo.new(0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 20, 0.5, 0)}):Play()
-                    TweenService:Create(circle, TweenInfo.new(0.28), {BackgroundColor3 = self._parent.Theme.Dark}):Play()
-                    TweenService:Create(toggleBtn, TweenInfo.new(0.28), {BackgroundColor3 = self._parent.Theme.Primary}):Play()
+                    local t = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+                    TweenService:Create(circle, t, {Position = UDim2.new(0, 26, 0.5, 0)}):Play()
+                    TweenService:Create(circle, TweenInfo.new(0.22), {BackgroundColor3 = self._parent.Theme.Dark}):Play()
+                    TweenService:Create(toggleBtn, TweenInfo.new(0.22), {BackgroundColor3 = self._parent.Theme.Primary}):Play()
                 else
                     outerStroke.Thickness = 1
-                    TweenService:Create(circle, TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 4, 0.5, 0)}):Play()
-                    TweenService:Create(circle, TweenInfo.new(0.28), {BackgroundColor3 = self._parent.Theme.Primary}):Play()
-                    TweenService:Create(toggleBtn, TweenInfo.new(0.28), {BackgroundColor3 = self._parent.Theme.Dark}):Play()
+                    TweenService:Create(circle, TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0.5, 0)}):Play()
+                    TweenService:Create(circle, TweenInfo.new(0.18), {BackgroundColor3 = self._parent.Theme.Primary}):Play()
+                    TweenService:Create(toggleBtn, TweenInfo.new(0.18), {BackgroundColor3 = self._parent.Theme.Dark}):Play()
                 end
             end
 
@@ -555,15 +557,43 @@ function Library.new(opts)
                 pcall(callback, state)
             end
 
-            -- Use :Activated which unifies touch and mouse activation across devices (recommended for mobile)
-            -- We intentionally connect both the row and the small toggle so tapping either toggles it.
-            clickArea.Activated:Connect(function() toggleAction() end)
-            toggleBtn.Activated:Connect(function() toggleAction() end)
+            -- Use :Activated which is the most reliable cross-device activation on Android.
+            -- Also add InputBegan touch fallback in case Activated is swallowed by parent ScrollingFrame.
+            toggleBtn.Activated:Connect(toggleAction)
+            toggleBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    toggleAction()
+                end
+            end)
 
-            -- Initialize
+            -- Row click also toggles; Activated preferred for touch
+            clickArea.Activated:Connect(toggleAction)
+            clickArea.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    -- Only treat quick taps as toggles — if it's a drag (scroll), ignore:
+                    local startPos = input.Position
+                    local conn
+                    conn = UserInputService.InputChanged:Connect(function(i)
+                        if i == input then
+                            if (i.Position - startPos).magnitude > 8 then
+                                if conn then conn:Disconnect(); conn = nil end
+                            end
+                        end
+                    end)
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            if conn then conn:Disconnect(); conn = nil end
+                            toggleAction()
+                        end
+                    end)
+                end
+            end)
+
+            -- Initialize visuals and callback
             setVisual(state)
             pcall(function() if callback then callback(state) end end)
 
+            -- Return API consistent with other controls in your library
             return {
                 Frame = container,
                 Get = function() return state end,
@@ -733,16 +763,6 @@ function Library.new(opts)
                     local selIndicator = make("Frame", { Parent = itemBtn, Name = "SelectedItems", BackgroundColor3 = self._parent.Theme.Primary, BackgroundTransparency = 1, Size = UDim2.new(0,3,0,14), Position = UDim2.new(0, -8, 0.5, 0), AnchorPoint = Vector2.new(0,0.5), ZIndex = 10002 })
                     make("UICorner", { Parent = selIndicator, CornerRadius = UDim.new(0,6) })
 
-                    itemBtn.MouseEnter:Connect(function()
-                        TweenService:Create(itemBtn, TweenInfo.new(0.18), {TextTransparency = 0}):Play()
-                        TweenService:Create(itemBtn, TweenInfo.new(0.18), {BackgroundTransparency = 0.8}):Play()
-                        TweenService:Create(selIndicator, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
-                    end)
-                    itemBtn.MouseLeave:Connect(function()
-                        TweenService:Create(itemBtn, TweenInfo.new(0.18), {TextTransparency = 0.5}):Play()
-                        TweenService:Create(itemBtn, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
-                        TweenService:Create(selIndicator, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
-                    end)
                     itemBtn.Activated:Connect(function()
                         open = false
                         selectBtn.Text = "   " .. itemBtn.Text
